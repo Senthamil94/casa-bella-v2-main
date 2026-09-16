@@ -56,7 +56,15 @@
   chapters.forEach(function(c){
     cio.observe(c);
     c.addEventListener('mouseenter', function(){ c.classList.add('revealed'); });
+    c.addEventListener('mouseleave', function(){
+      if(!c.contains(document.activeElement)) c.classList.remove('revealed');
+    });
     c.addEventListener('focusin', function(){ c.classList.add('revealed'); });
+    c.addEventListener('focusout', function(){
+      setTimeout(function(){
+        if(!c.contains(document.activeElement) && !c.matches(':hover')) c.classList.remove('revealed');
+      }, 0);
+    });
   });
 
   if(!reduce){
