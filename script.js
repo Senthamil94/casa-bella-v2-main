@@ -61,10 +61,16 @@
     touchMode = true;
     document.documentElement.classList.add('touch-ui');
   }
-  function clearTapped(){
+  function setActiveChapter(target){
     chapters.forEach(function(c){
-      c.classList.remove('tapped', 'in-view');
-      if(touchMode) c.classList.remove('revealed');
+      var on = c === target;
+      c.classList.toggle('tapped', on);
+      c.classList.toggle('in-view', on);
+      if(on){
+        c.classList.add('seen', 'revealed');
+      } else if(touchMode){
+        c.classList.remove('revealed');
+      }
     });
   }
   if(isTouchUI()) enableTouchMode();
@@ -76,7 +82,7 @@
     else {
       touchMode = false;
       document.documentElement.classList.remove('touch-ui');
-      clearTapped();
+      setActiveChapter(null);
     }
   });
 
@@ -87,21 +93,28 @@
     if(e.target.closest && e.target.closest('a, button, input, textarea, select, label')) return;
     if(!touchMode && !isTouchUI()) return;
     enableTouchMode();
-    if(c.classList.contains('tapped')) return;
-    clearTapped();
-    c.classList.add('seen', 'tapped', 'revealed');
+    setActiveChapter(c);
   }
   chapters.forEach(function(c){
-    var startY = 0;
+    var startX = 0, startY = 0, moved = false;
+    var hit = document.createElement('div');
+    hit.className = 'ch-hit';
+    hit.setAttribute('aria-hidden', 'true');
+    c.insertBefore(hit, c.firstChild);
     cio.observe(c);
-    c.addEventListener('touchstart', function(e){
-      startY = e.touches[0] ? e.touches[0].clientY : 0;
+    c.addEventListener('pointerdown', function(e){
+      startX = e.clientX;
+      startY = e.clientY;
+      moved = false;
     }, {passive:true});
-    c.addEventListener('touchend', function(e){
-      var y = e.changedTouches[0] ? e.changedTouches[0].clientY : startY;
-      if(Math.abs(y - startY) > 14) return;
+    c.addEventListener('pointermove', function(e){
+      if(Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12) moved = true;
+    }, {passive:true});
+    c.addEventListener('pointerup', function(e){
+      if(moved) return;
+      if(!touchMode && !isTouchUI() && e.pointerType === 'mouse') return;
       revealChapter(c, e);
-    }, {passive:true});
+    });
     c.addEventListener('click', function(e){ revealChapter(c, e); });
     c.addEventListener('mouseenter', function(){
       if(touchMode || isTouchUI()) return;
