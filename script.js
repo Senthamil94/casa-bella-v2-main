@@ -51,14 +51,13 @@
   /* Chapter reveal + parallax */
   var chapters = document.querySelectorAll('.chapter');
   var touchMode = false;
+  var tapScrollY = 0;
+  var startX = 0, startY = 0, startScroll = 0, tracking = false, isPan = false;
   function isTouchUI(){
     return window.matchMedia('(hover: none)').matches
       || window.matchMedia('(pointer: coarse)').matches
       || window.matchMedia('(any-pointer: coarse)').matches
       || window.matchMedia('(max-width: 1024px)').matches;
-  }
-  function viewportH(){
-    return (window.visualViewport && window.visualViewport.height) || window.innerHeight || 1;
   }
   function enableTouchMode(){
     if(touchMode) return;
@@ -88,27 +87,43 @@
     }
     return null;
   }
-  function updateActiveChapter(){
-    if(!touchMode && !isTouchUI()) return;
-    enableTouchMode();
-    var vh = viewportH();
-    var best = null, bestAmt = 0;
-    chapters.forEach(function(c){
-      var r = c.getBoundingClientRect();
-      var vis = Math.min(r.bottom, vh) - Math.max(r.top, 0);
-      if(vis > bestAmt){ bestAmt = vis; best = c; }
-    });
-    setActiveChapter(best && bestAmt > vh * 0.2 ? best : null);
+  function ignoreTarget(el){
+    return el && el.closest && el.closest('a, button, input, textarea, select, label, #chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge, #loader');
   }
-  function onFinger(e){
-    if(e.target && e.target.closest && e.target.closest('a, button, input, textarea, select, label, #chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge')) return;
-    var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
-    if(!t || typeof t.clientX !== 'number') return;
+  function pointFromEvent(e){
+    return (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  }
+  function onStart(e){
     if(e.pointerType === 'mouse' && !isTouchUI() && !touchMode) return;
+    if(ignoreTarget(e.target)) return;
+    var t = pointFromEvent(e);
+    if(!t || typeof t.clientX !== 'number') return;
+    startX = t.clientX;
+    startY = t.clientY;
+    startScroll = window.scrollY;
+    tracking = true;
+    isPan = false;
+  }
+  function onMove(e){
+    if(!tracking) return;
+    var t = pointFromEvent(e);
+    if(!t || typeof t.clientX !== 'number') return;
+    if(Math.abs(t.clientX - startX) > 36 || Math.abs(t.clientY - startY) > 36) isPan = true;
+    if(Math.abs(window.scrollY - startScroll) > 6) isPan = true;
+  }
+  function onEnd(e){
+    if(!tracking) return;
+    tracking = false;
+    if(isPan || Math.abs(window.scrollY - startScroll) > 6) return;
+    if(e.pointerType === 'mouse' && !isTouchUI() && !touchMode) return;
+    if(ignoreTarget(e.target)) return;
+    var t = pointFromEvent(e);
+    if(!t || typeof t.clientX !== 'number') return;
     enableTouchMode();
-    var ch = chapterFromPoint(t.clientX, t.clientY);
-    if(ch) setActiveChapter(ch);
-    else updateActiveChapter();
+    var ch = chapterFromPoint(t.clientX, t.clientY) || (e.target && e.target.closest && e.target.closest('.chapter'));
+    if(!ch) return;
+    setActiveChapter(ch);
+    tapScrollY = window.scrollY;
   }
   if(isTouchUI()) enableTouchMode();
 
@@ -138,40 +153,26 @@
   });
 
   var fingerOpts = {passive:true, capture:true};
-  window.addEventListener('touchstart', onFinger, fingerOpts);
-  window.addEventListener('touchmove', onFinger, fingerOpts);
-  window.addEventListener('pointerdown', onFinger, fingerOpts);
-  window.addEventListener('pointermove', function(e){
-    if(e.pointerType === 'touch' || isTouchUI()) onFinger(e);
-  }, fingerOpts);
-
-  var activeTick = false;
-  function onScrollReveal(){
+  window.addEventListener('touchstart', onStart, fingerOpts);
+  window.addEventListener('touchmove', onMove, fingerOpts);
+  window.addEventListener('touchend', onEnd, fingerOpts);
+  window.addEventListener('pointerdown', onStart, fingerOpts);
+  window.addEventListener('pointermove', onMove, fingerOpts);
+  window.addEventListener('pointerup', onEnd, fingerOpts);
+  window.addEventListener('scroll', function(){
     if(!touchMode && !isTouchUI()) return;
-    if(activeTick) return;
-    activeTick = true;
-    requestAnimationFrame(function(){
-      updateActiveChapter();
-      activeTick = false;
-    });
-  }
-  window.addEventListener('scroll', onScrollReveal, {passive:true});
-  window.addEventListener('touchend', onScrollReveal, {passive:true});
+    isPan = true;
+    if(Math.abs(window.scrollY - tapScrollY) < 24) return;
+    setActiveChapter(null);
+  }, {passive:true});
   window.addEventListener('resize', function(){
-    if(isTouchUI()){
-      enableTouchMode();
-      updateActiveChapter();
-    } else {
+    if(isTouchUI()) enableTouchMode();
+    else {
       touchMode = false;
       document.documentElement.classList.remove('touch-ui');
       setActiveChapter(null);
     }
   });
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('scroll', onScrollReveal, {passive:true});
-    window.visualViewport.addEventListener('resize', onScrollReveal, {passive:true});
-  }
-  updateActiveChapter();
 
   if(!reduce){
     var bgs = document.querySelectorAll('.ch-bg');

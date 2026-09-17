@@ -119,9 +119,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* ---------- Chapters ---------- */
 .chapter{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center;cursor:pointer;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 .ch-bg{position:absolute;inset:-12% 0;background-size:cover;background-position:center;will-change:transform;scale:1;transition:scale 1.2s var(--ease);z-index:0;pointer-events:none}
-.chapter:hover .ch-bg,.chapter.revealed .ch-bg,.chapter.tapped .ch-bg,.chapter.in-view .ch-bg{scale:1.07}
+.chapter:hover .ch-bg,.chapter.revealed .ch-bg,.chapter.tapped .ch-bg{scale:1.07}
 .chapter::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,rgba(20,14,8,.55) 0%,rgba(20,14,8,.78) 100%);transition:background .6s var(--ease)}
-.chapter:hover::after,.chapter:focus-within::after,.chapter.revealed::after,.chapter.tapped::after,.chapter.in-view::after{background:radial-gradient(ellipse at center,rgba(20,14,8,.7) 0%,rgba(20,14,8,.9) 100%)}
+.chapter:hover::after,.chapter:focus-within::after,.chapter.revealed::after,.chapter.tapped::after{background:radial-gradient(ellipse at center,rgba(20,14,8,.7) 0%,rgba(20,14,8,.9) 100%)}
+html.touch-ui .chapter:hover .ch-bg{scale:1}
+html.touch-ui .chapter.tapped .ch-bg,html.touch-ui .chapter.tapped:hover .ch-bg{scale:1.07}
+html.touch-ui .chapter:hover::after,html.touch-ui .chapter:focus-within::after{
+  background:radial-gradient(ellipse at center,rgba(20,14,8,.55) 0%,rgba(20,14,8,.78) 100%)
+}
+html.touch-ui .chapter.tapped::after,html.touch-ui .chapter.tapped:hover::after{
+  background:radial-gradient(ellipse at center,rgba(20,14,8,.7) 0%,rgba(20,14,8,.9) 100%)
+}
 .ch-inner{position:relative;z-index:2;padding:120px 6vw;max-width:900px;width:100%}
 .ch-no{font-family:var(--serif);font-size:.78rem;letter-spacing:.58em;text-transform:uppercase;color:var(--gold-pale);font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.7);margin-bottom:20px;opacity:0;transform:translateY(20px);transition:all .9s var(--ease)}
 .ch-title{font-family:var(--script);font-size:clamp(2.7rem,8vw,6.2rem);color:#fff;font-weight:700;line-height:1.3;padding:0 .1em;text-shadow:0 4px 28px rgba(0,0,0,.85),0 2px 8px rgba(0,0,0,.7);opacity:0;transform:translateY(30px);transition:all 1s var(--ease) .12s}
@@ -142,14 +150,27 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .btn-gold{background:var(--gold);color:var(--espresso)}
 .btn-gold:hover{background:var(--gold-pale);letter-spacing:.4em}
 .chapter.seen .ch-no,.chapter.seen .ch-title{opacity:1;transform:none}
-.chapter.seen:hover .ch-reveal,
-.chapter.seen:focus-within .ch-reveal,
-.chapter.seen.revealed .ch-reveal,
-.chapter.seen.tapped .ch-reveal,
-.chapter.seen.in-view .ch-reveal{
+@media (hover:hover) and (pointer:fine){
+  html:not(.touch-ui) .chapter.seen:hover .ch-reveal,
+  html:not(.touch-ui) .chapter.seen:focus-within .ch-reveal{
+    opacity:1;visibility:visible;transform:none;pointer-events:auto
+  }
+}
+html.touch-ui .chapter.seen.tapped .ch-reveal,
+html.touch-ui .chapter.seen.tapped:hover .ch-reveal{
   opacity:1;visibility:visible;transform:none;pointer-events:auto
 }
 @media (max-width:1024px){
+  html.touch-ui .chapter.seen:hover .ch-reveal,
+  html.touch-ui .chapter.seen:focus-within .ch-reveal,
+  html.touch-ui .chapter.seen.in-view .ch-reveal{
+    opacity:0;visibility:hidden;pointer-events:none;transform:translateY(18px)
+  }
+  html.touch-ui .chapter.seen.tapped .ch-reveal,
+  html.touch-ui .chapter.seen.tapped:hover .ch-reveal,
+  html.touch-ui .chapter.seen.tapped:focus-within .ch-reveal{
+    opacity:1;visibility:visible;transform:none;pointer-events:auto
+  }
   .ch-inner{padding:96px 5vw 72px}
 }
 /* chapter divider ornament */
