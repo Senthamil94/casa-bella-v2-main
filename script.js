@@ -50,29 +50,94 @@
 
   /* Chapter reveal + parallax */
   var chapters = document.querySelectorAll('.chapter');
+  var touchMode = false;
+  function isTouchUI(){
+    return window.matchMedia('(hover: none)').matches
+      || window.matchMedia('(pointer: coarse)').matches
+      || window.matchMedia('(any-pointer: coarse)').matches
+      || window.matchMedia('(any-hover: none)').matches
+      || window.matchMedia('(max-width: 1024px)').matches
+      || ((navigator.maxTouchPoints || 0) > 0);
+  }
+  function enableTouchMode(){
+    if(touchMode) return;
+    touchMode = true;
+    document.documentElement.classList.add('touch-ui');
+    updateActiveChapter();
+  }
+  function updateActiveChapter(){
+    if(!touchMode) return;
+    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 1;
+    var best = null, bestAmt = 0;
+    chapters.forEach(function(c){
+      var r = c.getBoundingClientRect();
+      var vis = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+      if(vis > bestAmt){ bestAmt = vis; best = c; }
+    });
+    chapters.forEach(function(c){
+      var on = c === best && bestAmt > vh * 0.35;
+      c.classList.toggle('in-view', on);
+      if(on){
+        c.classList.add('seen', 'revealed');
+      } else {
+        c.classList.remove('revealed');
+      }
+    });
+  }
+  if(isTouchUI()) enableTouchMode();
+  window.addEventListener('touchstart', enableTouchMode, {passive:true});
+  window.addEventListener('pointerdown', function(e){
+    if(e.pointerType === 'touch') enableTouchMode();
+  }, {passive:true});
+  window.addEventListener('resize', function(){
+    if(isTouchUI()) enableTouchMode();
+    updateActiveChapter();
+  });
+  window.addEventListener('orientationchange', function(){ setTimeout(updateActiveChapter, 80); });
+
   var cio = new IntersectionObserver(function(es){
-    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('seen'); } });
-  }, {threshold:.3});
+    es.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('seen'); });
+  }, {threshold:.12});
   chapters.forEach(function(c){
     cio.observe(c);
+    c.addEventListener('pointerup', function(e){
+      if(e.pointerType !== 'touch' && !touchMode) return;
+      enableTouchMode();
+      updateActiveChapter();
+    });
     c.addEventListener('mouseenter', function(){ c.classList.add('revealed'); });
     c.addEventListener('mouseleave', function(){
+      if(touchMode) return;
       if(!c.contains(document.activeElement)) c.classList.remove('revealed');
     });
     c.addEventListener('focusin', function(){ c.classList.add('revealed'); });
     c.addEventListener('focusout', function(){
       setTimeout(function(){
+        if(touchMode) return;
         if(!c.contains(document.activeElement) && !c.matches(':hover')) c.classList.remove('revealed');
       }, 0);
     });
   });
+  updateActiveChapter();
+
+  var activeTick = false;
+  function onScrollOrTouch(){
+    if(activeTick) return;
+    activeTick = true;
+    requestAnimationFrame(function(){
+      updateActiveChapter();
+      activeTick = false;
+    });
+  }
+  window.addEventListener('scroll', onScrollOrTouch, {passive:true});
+  window.addEventListener('touchmove', onScrollOrTouch, {passive:true});
 
   if(!reduce){
     var bgs = document.querySelectorAll('.ch-bg');
     var ticking = false;
     window.addEventListener('scroll', function(){
       if(ticking) return;
-      ticking = true;
+        ticking = true;
       requestAnimationFrame(function(){
         bgs.forEach(function(bg){
           var r = bg.parentElement.getBoundingClientRect();
