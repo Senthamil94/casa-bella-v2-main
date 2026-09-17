@@ -54,7 +54,11 @@
   function isTouchUI(){
     return window.matchMedia('(hover: none)').matches
       || window.matchMedia('(pointer: coarse)').matches
+      || window.matchMedia('(any-pointer: coarse)').matches
       || window.matchMedia('(max-width: 1024px)').matches;
+  }
+  function viewportH(){
+    return (window.visualViewport && window.visualViewport.height) || window.innerHeight || 1;
   }
   function enableTouchMode(){
     if(touchMode) return;
@@ -73,49 +77,46 @@
       }
     });
   }
-  if(isTouchUI()) enableTouchMode();
-  window.addEventListener('pointerdown', function(e){
-    if(e.pointerType === 'touch' || isTouchUI()) enableTouchMode();
-  }, {passive:true});
-  window.addEventListener('resize', function(){
-    if(isTouchUI()) enableTouchMode();
-    else {
-      touchMode = false;
-      document.documentElement.classList.remove('touch-ui');
-      setActiveChapter(null);
+  function chapterFromPoint(x, y){
+    var els = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+    for(var i = 0; i < els.length; i++){
+      var el = els[i];
+      if(!el) continue;
+      if(el.closest && el.closest('#chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge, #loader')) continue;
+      var ch = el.closest && el.closest('.chapter');
+      if(ch) return ch;
     }
-  });
+    return null;
+  }
+  function updateActiveChapter(){
+    if(!touchMode && !isTouchUI()) return;
+    enableTouchMode();
+    var vh = viewportH();
+    var best = null, bestAmt = 0;
+    chapters.forEach(function(c){
+      var r = c.getBoundingClientRect();
+      var vis = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+      if(vis > bestAmt){ bestAmt = vis; best = c; }
+    });
+    setActiveChapter(best && bestAmt > vh * 0.2 ? best : null);
+  }
+  function onFinger(e){
+    if(e.target && e.target.closest && e.target.closest('a, button, input, textarea, select, label, #chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge')) return;
+    var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+    if(!t || typeof t.clientX !== 'number') return;
+    if(e.pointerType === 'mouse' && !isTouchUI() && !touchMode) return;
+    enableTouchMode();
+    var ch = chapterFromPoint(t.clientX, t.clientY);
+    if(ch) setActiveChapter(ch);
+    else updateActiveChapter();
+  }
+  if(isTouchUI()) enableTouchMode();
 
   var cio = new IntersectionObserver(function(es){
     es.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('seen'); });
-  }, {threshold:.12});
-  function revealChapter(c, e){
-    if(e.target.closest && e.target.closest('a, button, input, textarea, select, label')) return;
-    if(!touchMode && !isTouchUI()) return;
-    enableTouchMode();
-    setActiveChapter(c);
-  }
+  }, {threshold:.08});
   chapters.forEach(function(c){
-    var startX = 0, startY = 0, moved = false;
-    var hit = document.createElement('div');
-    hit.className = 'ch-hit';
-    hit.setAttribute('aria-hidden', 'true');
-    c.insertBefore(hit, c.firstChild);
     cio.observe(c);
-    c.addEventListener('pointerdown', function(e){
-      startX = e.clientX;
-      startY = e.clientY;
-      moved = false;
-    }, {passive:true});
-    c.addEventListener('pointermove', function(e){
-      if(Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12) moved = true;
-    }, {passive:true});
-    c.addEventListener('pointerup', function(e){
-      if(moved) return;
-      if(!touchMode && !isTouchUI() && e.pointerType === 'mouse') return;
-      revealChapter(c, e);
-    });
-    c.addEventListener('click', function(e){ revealChapter(c, e); });
     c.addEventListener('mouseenter', function(){
       if(touchMode || isTouchUI()) return;
       c.classList.add('revealed');
@@ -135,6 +136,42 @@
       }, 0);
     });
   });
+
+  var fingerOpts = {passive:true, capture:true};
+  window.addEventListener('touchstart', onFinger, fingerOpts);
+  window.addEventListener('touchmove', onFinger, fingerOpts);
+  window.addEventListener('pointerdown', onFinger, fingerOpts);
+  window.addEventListener('pointermove', function(e){
+    if(e.pointerType === 'touch' || isTouchUI()) onFinger(e);
+  }, fingerOpts);
+
+  var activeTick = false;
+  function onScrollReveal(){
+    if(!touchMode && !isTouchUI()) return;
+    if(activeTick) return;
+    activeTick = true;
+    requestAnimationFrame(function(){
+      updateActiveChapter();
+      activeTick = false;
+    });
+  }
+  window.addEventListener('scroll', onScrollReveal, {passive:true});
+  window.addEventListener('touchend', onScrollReveal, {passive:true});
+  window.addEventListener('resize', function(){
+    if(isTouchUI()){
+      enableTouchMode();
+      updateActiveChapter();
+    } else {
+      touchMode = false;
+      document.documentElement.classList.remove('touch-ui');
+      setActiveChapter(null);
+    }
+  });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('scroll', onScrollReveal, {passive:true});
+    window.visualViewport.addEventListener('resize', onScrollReveal, {passive:true});
+  }
+  updateActiveChapter();
 
   if(!reduce){
     var bgs = document.querySelectorAll('.ch-bg');
