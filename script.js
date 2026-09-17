@@ -51,79 +51,45 @@
   /* Chapter reveal + parallax */
   var chapters = document.querySelectorAll('.chapter');
   var touchMode = false;
-  var tapScrollY = 0;
-  var startX = 0, startY = 0, startScroll = 0, tracking = false, isPan = false;
+  var touchHover = { pointerId: null, chapter: null, fromChapter: false };
   function isTouchUI(){
-    return window.matchMedia('(hover: none)').matches
-      || window.matchMedia('(pointer: coarse)').matches
-      || window.matchMedia('(any-pointer: coarse)').matches
-      || window.matchMedia('(max-width: 1024px)').matches;
+    return window.matchMedia('(max-width: 1024px)').matches
+      || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }
   function enableTouchMode(){
     if(touchMode) return;
     touchMode = true;
     document.documentElement.classList.add('touch-ui');
   }
-  function setActiveChapter(target){
-    chapters.forEach(function(c){
-      var on = c === target;
-      c.classList.toggle('tapped', on);
-      c.classList.toggle('in-view', on);
-      if(on){
-        c.classList.add('seen', 'revealed');
-      } else if(touchMode){
-        c.classList.remove('revealed');
-      }
-    });
+  function clearTouchHover(){
+    chapters.forEach(function(c){ c.classList.remove('touch-hover'); });
+    touchHover.pointerId = null;
+    touchHover.chapter = null;
+    touchHover.fromChapter = false;
   }
-  function chapterFromPoint(x, y){
-    var els = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
-    for(var i = 0; i < els.length; i++){
-      var el = els[i];
-      if(!el) continue;
-      if(el.closest && el.closest('#chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge, #loader')) continue;
-      var ch = el.closest && el.closest('.chapter');
-      if(ch) return ch;
-    }
-    return null;
-  }
-  function ignoreTarget(el){
+  function ignoreTouchHoverTarget(el){
     return el && el.closest && el.closest('a, button, input, textarea, select, label, #chrome, #menu, #menuBack, .ovl, #lightbox, #bookBadge, #loader');
   }
-  function pointFromEvent(e){
-    return (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  function showTouchHover(chapter){
+    chapters.forEach(function(c){
+      var on = c === chapter;
+      c.classList.toggle('touch-hover', on);
+      if(on) c.classList.add('seen');
+    });
   }
-  function onStart(e){
-    if(e.pointerType === 'mouse' && !isTouchUI() && !touchMode) return;
-    if(ignoreTarget(e.target)) return;
-    var t = pointFromEvent(e);
-    if(!t || typeof t.clientX !== 'number') return;
-    startX = t.clientX;
-    startY = t.clientY;
-    startScroll = window.scrollY;
-    tracking = true;
-    isPan = false;
-  }
-  function onMove(e){
-    if(!tracking) return;
-    var t = pointFromEvent(e);
-    if(!t || typeof t.clientX !== 'number') return;
-    if(Math.abs(t.clientX - startX) > 36 || Math.abs(t.clientY - startY) > 36) isPan = true;
-    if(Math.abs(window.scrollY - startScroll) > 6) isPan = true;
-  }
-  function onEnd(e){
-    if(!tracking) return;
-    tracking = false;
-    if(isPan || Math.abs(window.scrollY - startScroll) > 6) return;
-    if(e.pointerType === 'mouse' && !isTouchUI() && !touchMode) return;
-    if(ignoreTarget(e.target)) return;
-    var t = pointFromEvent(e);
-    if(!t || typeof t.clientX !== 'number') return;
-    enableTouchMode();
-    var ch = chapterFromPoint(t.clientX, t.clientY) || (e.target && e.target.closest && e.target.closest('.chapter'));
+  function onTouchPointerDown(e){
+    if(!isTouchUI()) return;
+    if(ignoreTouchHoverTarget(e.target)){
+      if(e.target.closest && e.target.closest('.chapter.touch-hover')) return;
+      return;
+    }
+    var ch = e.target.closest && e.target.closest('.chapter');
     if(!ch) return;
-    setActiveChapter(ch);
-    tapScrollY = window.scrollY;
+    enableTouchMode();
+    touchHover.pointerId = e.pointerId;
+    touchHover.chapter = ch;
+    touchHover.fromChapter = true;
+    showTouchHover(ch);
   }
   if(isTouchUI()) enableTouchMode();
 
@@ -131,6 +97,10 @@
     es.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('seen'); });
   }, {threshold:.08});
   chapters.forEach(function(c){
+    var hit = document.createElement('div');
+    hit.className = 'ch-hit';
+    hit.setAttribute('aria-hidden', 'true');
+    c.appendChild(hit);
     cio.observe(c);
     c.addEventListener('mouseenter', function(){
       if(touchMode || isTouchUI()) return;
@@ -150,27 +120,29 @@
         if(!c.contains(document.activeElement) && !c.matches(':hover')) c.classList.remove('revealed');
       }, 0);
     });
+    c.addEventListener('click', function(e){
+      if(!isTouchUI() && !touchMode) return;
+      if(e.target.closest && e.target.closest('a, button')) return;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
   });
 
-  var fingerOpts = {passive:true, capture:true};
-  window.addEventListener('touchstart', onStart, fingerOpts);
-  window.addEventListener('touchmove', onMove, fingerOpts);
-  window.addEventListener('touchend', onEnd, fingerOpts);
-  window.addEventListener('pointerdown', onStart, fingerOpts);
-  window.addEventListener('pointermove', onMove, fingerOpts);
-  window.addEventListener('pointerup', onEnd, fingerOpts);
-  window.addEventListener('scroll', function(){
-    if(!touchMode && !isTouchUI()) return;
-    isPan = true;
-    if(Math.abs(window.scrollY - tapScrollY) < 24) return;
-    setActiveChapter(null);
-  }, {passive:true});
+  var touchOpts = {passive:true, capture:true};
+  window.addEventListener('pointerdown', onTouchPointerDown, touchOpts);
+  window.addEventListener('touchstart', function(e){
+    if(!isTouchUI() || !e.target) return;
+    onTouchPointerDown({
+      target: e.target,
+      pointerId: (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].identifier : null
+    });
+  }, touchOpts);
   window.addEventListener('resize', function(){
     if(isTouchUI()) enableTouchMode();
     else {
       touchMode = false;
       document.documentElement.classList.remove('touch-ui');
-      setActiveChapter(null);
+      clearTouchHover();
     }
   });
 
