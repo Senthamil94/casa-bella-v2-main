@@ -33,7 +33,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 }
 /* ---------- Preloader ---------- */
 #loader{position:fixed;inset:0;z-index:9999;background:var(--espresso);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.1s var(--ease),visibility 1.1s}
-#loader.done{opacity:0;visibility:hidden}
+#loader.done{opacity:0;visibility:hidden;pointer-events:none}
 #loader .ring{position:relative;width:118px;height:118px;display:flex;align-items:center;justify-content:center}
 #loader .ring::before{content:'';position:absolute;inset:0;border-radius:50%;border:1px solid rgba(211,180,120,.25)}
 #loader .ring::after{content:'';position:absolute;inset:0;border-radius:50%;border:1px solid transparent;border-top-color:var(--gold);animation:spin 1.6s linear infinite}
@@ -117,7 +117,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 @keyframes drop{to{top:110%}}
 
 /* ---------- Chapters ---------- */
-.chapter{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
+.chapter{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center;cursor:pointer}
 .ch-bg{position:absolute;inset:-12% 0;background-size:cover;background-position:center;will-change:transform;scale:1;transition:scale 1.2s var(--ease)}
 .chapter:hover .ch-bg,.chapter.revealed .ch-bg{scale:1.07}
 .chapter::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(20,14,8,.55) 0%,rgba(20,14,8,.78) 100%);transition:background .6s var(--ease)}
@@ -148,10 +148,21 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
     opacity:1;visibility:visible;transform:none;pointer-events:auto
   }
 }
-.chapter.seen.in-view .ch-reveal{
+html.touch-ui .chapter.seen.tapped .ch-reveal,
+html.touch-ui .chapter.seen.tapped:hover .ch-reveal{
   opacity:1;visibility:visible;transform:none;pointer-events:auto
 }
-@media (max-width:1024px){
+@media (max-width:1024px), (hover:none), (pointer:coarse){
+  .chapter.seen:hover .ch-reveal,
+  .chapter.seen:focus-within .ch-reveal,
+  .chapter.seen.in-view .ch-reveal{
+    opacity:0;visibility:hidden;pointer-events:none;transform:translateY(18px)
+  }
+  .chapter.seen.tapped .ch-reveal,
+  .chapter.seen.tapped:hover .ch-reveal,
+  .chapter.seen.tapped:focus-within .ch-reveal{
+    opacity:1;visibility:visible;transform:none;pointer-events:auto
+  }
   .ch-inner{padding:96px 5vw 72px}
 }
 /* chapter divider ornament */

@@ -54,83 +54,74 @@
   function isTouchUI(){
     return window.matchMedia('(hover: none)').matches
       || window.matchMedia('(pointer: coarse)').matches
-      || window.matchMedia('(any-pointer: coarse)').matches
-      || window.matchMedia('(any-hover: none)').matches
-      || window.matchMedia('(max-width: 1024px)').matches
-      || ((navigator.maxTouchPoints || 0) > 0);
+      || window.matchMedia('(max-width: 1024px)').matches;
   }
   function enableTouchMode(){
     if(touchMode) return;
     touchMode = true;
     document.documentElement.classList.add('touch-ui');
-    updateActiveChapter();
   }
-  function updateActiveChapter(){
-    if(!touchMode) return;
-    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 1;
-    var best = null, bestAmt = 0;
+  function clearTapped(){
     chapters.forEach(function(c){
-      var r = c.getBoundingClientRect();
-      var vis = Math.min(r.bottom, vh) - Math.max(r.top, 0);
-      if(vis > bestAmt){ bestAmt = vis; best = c; }
-    });
-    chapters.forEach(function(c){
-      var on = c === best && bestAmt > vh * 0.35;
-      c.classList.toggle('in-view', on);
-      if(on){
-        c.classList.add('seen', 'revealed');
-      } else {
-        c.classList.remove('revealed');
-      }
+      c.classList.remove('tapped', 'in-view');
+      if(touchMode) c.classList.remove('revealed');
     });
   }
   if(isTouchUI()) enableTouchMode();
-  window.addEventListener('touchstart', enableTouchMode, {passive:true});
   window.addEventListener('pointerdown', function(e){
-    if(e.pointerType === 'touch') enableTouchMode();
+    if(e.pointerType === 'touch' || isTouchUI()) enableTouchMode();
   }, {passive:true});
   window.addEventListener('resize', function(){
     if(isTouchUI()) enableTouchMode();
-    updateActiveChapter();
+    else {
+      touchMode = false;
+      document.documentElement.classList.remove('touch-ui');
+      clearTapped();
+    }
   });
-  window.addEventListener('orientationchange', function(){ setTimeout(updateActiveChapter, 80); });
 
   var cio = new IntersectionObserver(function(es){
     es.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('seen'); });
   }, {threshold:.12});
+  function revealChapter(c, e){
+    if(e.target.closest && e.target.closest('a, button, input, textarea, select, label')) return;
+    if(!touchMode && !isTouchUI()) return;
+    enableTouchMode();
+    if(c.classList.contains('tapped')) return;
+    clearTapped();
+    c.classList.add('seen', 'tapped', 'revealed');
+  }
   chapters.forEach(function(c){
+    var startY = 0;
     cio.observe(c);
-    c.addEventListener('pointerup', function(e){
-      if(e.pointerType !== 'touch' && !touchMode) return;
-      enableTouchMode();
-      updateActiveChapter();
+    c.addEventListener('touchstart', function(e){
+      startY = e.touches[0] ? e.touches[0].clientY : 0;
+    }, {passive:true});
+    c.addEventListener('touchend', function(e){
+      var y = e.changedTouches[0] ? e.changedTouches[0].clientY : startY;
+      if(Math.abs(y - startY) > 14) return;
+      revealChapter(c, e);
+    }, {passive:true});
+    c.addEventListener('click', function(e){ revealChapter(c, e); });
+    c.addEventListener('mouseenter', function(){
+      if(touchMode || isTouchUI()) return;
+      c.classList.add('revealed');
     });
-    c.addEventListener('mouseenter', function(){ c.classList.add('revealed'); });
     c.addEventListener('mouseleave', function(){
-      if(touchMode) return;
+      if(touchMode || isTouchUI()) return;
       if(!c.contains(document.activeElement)) c.classList.remove('revealed');
     });
-    c.addEventListener('focusin', function(){ c.classList.add('revealed'); });
+    c.addEventListener('focusin', function(){
+      if(touchMode || isTouchUI()) return;
+      c.classList.add('revealed');
+    });
     c.addEventListener('focusout', function(){
       setTimeout(function(){
-        if(touchMode) return;
+        if(touchMode || isTouchUI()) return;
         if(!c.contains(document.activeElement) && !c.matches(':hover')) c.classList.remove('revealed');
       }, 0);
     });
   });
-  updateActiveChapter();
-
-  var activeTick = false;
-  function onScrollOrTouch(){
-    if(activeTick) return;
-    activeTick = true;
-    requestAnimationFrame(function(){
-      updateActiveChapter();
-      activeTick = false;
-    });
-  }
-  window.addEventListener('scroll', onScrollOrTouch, {passive:true});
-  window.addEventListener('touchmove', onScrollOrTouch, {passive:true});
 
   if(!reduce){
     var bgs = document.querySelectorAll('.ch-bg');
